@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compound Interest Calculator</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css"
+        integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <script data-ad-client="ca-pub-9395000472595591" async
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
+</head>
+
+<body>
+    <h1>Compound Interest Calculator</h1>
+
+    <section id="input-form" class="main-entry">
+        <form>
+            <div>
+                <label for="initial-value">Enter your starting contribution: $</label>
+                <input type="number" min="0" step="0.01" placeholder="0.00" value="0.00" onfocus="this.value=''"
+                    id="initial-value" required>
+            </div>
+            <div>
+                <label for="monthly-contribution">Enter your monthly contribution: $</label>
+                <input type="number" step="0.01" placeholder="0.00" value="0.00" onfocus="this.value=''"
+                    id="monthly-contribution" required>
+            </div>
+            <div>
+                <label for="interest-rate">Enter the estimated annual return of your investments:</label>
+                <input type="number" min="0" step="0.01" placeholder="9.78" value="9.78" onfocus="this.value=''"
+                    id="interest-rate" required>
+                <label for="interest-rate">%</label>
+            </div>
+            <div>
+                <label for="num-months">Enter the number of months you'd like to estimate:</label>
+                <input type="number" min="1" max="1200" placeholder="120" value="120" onfocus="this.value=''"
+                    id="num-months" required>
+            </div>
+            <div>
+                <label for="contribution-increase-pct">Enter your annual increase to monthly contribution:</label>
+                <input type="number" step="0.01" placeholder="0" value="0" onfocus="this.value=''"
+                    id="contribution-increase-pct" required>
+                <label for="contribution-increase-pct">%</label>
+            </div>
+
+            <div><input type="button" class="btn btn-primary" value="Calculate!" onclick="plotChart()"
+                    id="submit-button">
+            </div>
+        </form>
+    </section>
+
+    <p class="final-value" id="final-value"></p>
+    <canvas id="finance-chart" width="8" height="2"></canvas>
+    <script>
+        const maxYears = 1200;
+        const defaultMonths = 120;
+        const defaultInitialContribution = 0;
+        const defaultMonthlyContribution = 0;
+        const defaultRateOfReturnPct = 9.78;
+        const defaultAnnualContributionIncrease = 0;
+
+        var myChart;
+
+        function getYearsAndMonths(totalMonths) {
+            return [Math.trunc(totalMonths / 12), totalMonths % 12];
+        }
+
+        function getYearString(months) {
+            const [numYears, remainingMonths] = getYearsAndMonths(months);
+            return 'Year ' + numYears + ' Month ' + remainingMonths;
+        }
+
+        function getFinalValueString(finalValue, years, months) {
+            var yearStr;
+            var monthStr;
+
+            switch (years) {
+                case 0:
+                    yearStr = "";
+                    break;
+                case 1:
+                    yearStr = "1 year";
+                    break;
+                default:
+                    yearStr = years + " years";
+            }
+
+            switch (months) {
+                case 0:
+                    monthStr = "";
+                    break;
+                case 1:
+                    monthStr = "1 month";
+                    break;
+                default:
+                    monthStr = months + " months";
+            }
+
+            if (years >= 1) {
+                if (months == 0) {
+                    return "After " + yearStr + " you would have: <b class='dollars'>" + new Intl.NumberFormat('en-EN', { style: 'currency', currency: 'USD' }).format(finalValue.toFixed(2)) + "</b>";
+                } else {
+                    return "After " + yearStr + " and " + monthStr + ", you would have: <b class='dollars'>" + new Intl.NumberFormat('en-EN', { style: 'currency', currency: 'USD' }).format(finalValue.toFixed(2)) + "</b>";
+                }
+            } else {
+                return "After " + monthStr + ", you would have: <b class='dollars'>" + new Intl.NumberFormat('en-EN', { style: 'currency', currency: 'USD' }).format(finalValue.toFixed(2)) + "</b>";
+            }
+        }
+
+        function generateData(months) {
+            months = months > maxYears ? maxYears : months;
+            months += 1;
+            var monthlyContribution = parseFloat(document.getElementById('monthly-contribution').value) || defaultMonthlyContribution;
+            const monthlyInterestRate = (parseFloat(document.getElementById('interest-rate').value) || defaultRateOfReturnPct) / 1200;
+            const annualIncreasePct = (parseFloat(document.getElementById('contribution-increase-pct').value || defaultAnnualContributionIncrease) / 100);
+
+            var curContributions = parseFloat(document.getElementById('initial-value').value) || defaultInitialContribution;
+            var curWealth = document.getElementById('initial-value').value;
+            var curInvestmentIncome = 0;
+            var labels = [];
+            var investmentIncome = [];
+            var contributions = [];
+            var i;
+            for (i = 0; i < months; i++) {
+                if (i != 0 && i % 12 == 0) {
+                    monthlyContribution *= (1 + annualIncreasePct);
+                }
+                labels.push(i);
+                investmentIncome.push(curInvestmentIncome);
+                contributions.push(curContributions);
+
+                curInvestmentIncome += curWealth * monthlyInterestRate;
+                curContributions += monthlyContribution;
+                curWealth = curWealth * (1 + monthlyInterestRate);
+                curWealth += monthlyContribution;
+            }
+            return [contributions, investmentIncome, labels];
+        }
+
+        function plotChart() {
+            const months = parseInt(document.getElementById('num-months').value) || defaultMonths;
+            const [contributions, investmentIncome, labels] = generateData(months);
+            const ctx = document.getElementById('finance-chart').getContext('2d');
+
+            if (myChart) {
+                myChart.data.labels = labels;
+                myChart.data.datasets[0].data = contributions;
+                myChart.data.datasets[1].data = investmentIncome;
+                myChart.update();
+            } else {
+                myChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Total Contributions',
+                                data: contributions,
+                                stack: 1,
+                                backgroundColor: "#af4bce",
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'Total Investment Return',
+                                data: investmentIncome,
+                                stack: 1,
+                                backgroundColor:
+                                    "#ea7369",
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        scales: {
+                            yAxes: [{
+                                ticks: {
+                                    beginAtZero: true,
+                                    callback: function (value, index, values) {
+                                        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+                                    }
+                                },
+                                stacked: true
+                            }]
+                        },
+                        tooltips: {
+                            mode: 'x',
+                            intersect: true,
+                            callbacks: {
+                                afterTitle: function () {
+                                    window.total = 0;
+                                },
+                                title: function (tooltipItems, data) {
+                                    return getYearString(tooltipItems[0].index);
+                                },
+                                label: function (tooltipItem, data) {
+                                    var cur = data.datasets[tooltipItem.datasetIndex].label;
+                                    var val = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
+                                    window.total += val;
+                                    return cur + ": " + new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val.toFixed(2));
+                                },
+                                footer: function () {
+                                    return "Total: " + new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(window.total.toFixed(2));
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            const finalValueContainer = document.getElementById('final-value');
+            const [totalYears, remainingMonths] = getYearsAndMonths(months);
+            const finalValue = contributions[contributions.length - 1] + investmentIncome[investmentIncome.length - 1];
+            finalValueContainer.innerHTML = getFinalValueString(finalValue, totalYears, remainingMonths);
+        }
+
+    </script>
+</body>
+
+</html>
